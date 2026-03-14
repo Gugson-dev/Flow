@@ -1,15 +1,32 @@
-version: "3"
+version: "3.9"
+
 services:
-  postgres:
-    image: postgres:15
-    restart: always
-    ports:
-      - "5432:5432"
+  db:
+    image: postgres:16-alpine
     environment:
       POSTGRES_USER: flow
       POSTGRES_PASSWORD: flow
       POSTGRES_DB: flowdb
+    ports:
+      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://flow:flow@db:5432/flowdb"
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
 volumes:
-  postgres_data:
+  db_data:
