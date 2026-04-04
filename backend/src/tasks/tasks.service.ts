@@ -20,4 +20,17 @@ export class TasksService {
       },
     });
   }
+
+  async update(id: string, completed: boolean) {
+    return this.prisma.task.update({
+      where: { id },
+      data: { completed },
+    });
+  }
+
+  async remove(id: string) {
+    return this.prisma.task.delete({
+      where: { id },
+    });
+  }
 }

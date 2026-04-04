@@ -182,3 +182,39 @@
     border-right-color: var(--border);
   }
 }
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--button-bg);
+  padding: 5px 10px;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  inline-size: 100%;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+
+span {
+  flex-grow: 1;
+  overflow-wrap: break-word;
+  inline-size: 85%;
+  height: auto;
+}
+
+input {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  display: block;
+}
