@@ -3,5 +3,9 @@
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }
-  ]
+  ],
+  "include": ["app", "vite.config.ts"],
+    "compilerOptions": {
+    "jsx": "react-jsx"
+  }
 }
