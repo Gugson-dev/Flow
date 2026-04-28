@@ -5,11 +5,11 @@ export function getPriorityColor(priority: Priority): string {
     case 1:
       return '#9ca3af'; // grey
     case 2:
-      return '#fbbf24'; // yellow
+      return '#3b82f6'; // yellow
     case 3:
-      return '#ef4444'; // red
+      return '#fbbf24'; // red
     case 4:
-      return '#3b82f6'; // blue
+      return '#ef4444'; // blue
   }
 }
 
