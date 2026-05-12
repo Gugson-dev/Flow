@@ -49,7 +49,7 @@ export const tasksApi = {
 };
 
 // =======================
-// PROJECTS (na przyszłość)
+// PROJECTS 
 // =======================
 
 export const projectsApi = {

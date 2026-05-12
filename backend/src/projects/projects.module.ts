@@ -1,10 +1,14 @@
 import { Module } from '@nestjs/common';
-import { ProjectsService } from './projects.service';
+
 import { ProjectsController } from './projects.controller';
-import { PrismaService } from '../prisma/prisma.service';
+import { ProjectsService } from './projects.service';
+
+import { PrismaModule } from '../prisma/prisma.module';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Module({
+  imports: [PrismaModule],
   controllers: [ProjectsController],
-  providers: [ProjectsService, PrismaService],
+  providers: [ProjectsService, RealtimeGateway],
 })
 export class ProjectsModule {}

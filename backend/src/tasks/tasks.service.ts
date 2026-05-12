@@ -1,16 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Injectable()
 export class TasksService {
-  constructor(private prisma: PrismaService) {}
 
-  async create(content: string) {
-    return this.prisma.task.create({
-      data: {
-        content,
-      },
+  constructor(private prisma: PrismaService, private realtime: RealtimeGateway) {}
+
+  async create(data: any) {
+    const task = await this.prisma.task.create({
+      data,
     });
+
+    this.realtime.emitTasksUpdated();
+
+    return task;
   }
 
   async findAll() {
@@ -21,16 +25,25 @@ export class TasksService {
     });
   }
 
-  async update(id: string, completed: boolean) {
-    return this.prisma.task.update({
+  async update(id: string, data: any) {
+    const task = await this.prisma.task.update({
       where: { id },
-      data: { completed },
+      data,
     });
+
+    this.realtime.emitTasksUpdated();
+
+    return task;
   }
 
-  async remove(id: string) {
-    return this.prisma.task.delete({
+  async delete(id: string) {
+    const task = await this.prisma.task.delete({
       where: { id },
     });
+
+    this.realtime.emitTasksUpdated();
+
+    return task;
   }
 }
+

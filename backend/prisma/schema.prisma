@@ -15,22 +15,29 @@ datasource db {
 }
 
 model Task {
-  id        String   @id @default(uuid())
-  content   String
-  completed Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  priority    Int
+  date        String
+  endDate     String?
+  completed   Boolean  @default(false)
+  projectId   String?
+  assignedTo  String?
 
-  projectId String?
+  createdAt   DateTime @default(now())
   project   Project? @relation(fields: [projectId], references: [id])
 }
 
 model Project {
-  id        String   @id @default(uuid())
-  name      String
-  color     String
-  theme     String
-  parentId  String?
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  name        String
+  color       String
+  theme       String
+  customColor String?
+  parentId    String?
+  sharedWith  String[]
 
+  createdAt   DateTime @default(now())
   tasks Task[]
 }

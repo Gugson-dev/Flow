@@ -4,9 +4,10 @@ import { AppService } from './app.service';
 import { TasksModule } from './tasks/tasks.module';
 import { PrismaModule } from './prisma/prisma.module'
 import { ProjectsModule } from './projects/projects.module';
+import { RealtimeGateway } from './realtime/realtime.gateway';
 @Module({
   imports: [TasksModule, PrismaModule, ProjectsModule],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, RealtimeGateway],
 })
 export class AppModule {}
