@@ -1,6 +1,6 @@
 import type { Project, Task } from "../app/types";
 
-const API_URL = "http://localhost:3000";
+const API_URL = "http://192.168.1.42:3000";
 
 async function request<T>(
   endpoint: string,

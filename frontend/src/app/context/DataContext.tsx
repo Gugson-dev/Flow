@@ -1,6 +1,17 @@
-import { createContext, useState, type ReactNode, useEffect } from 'react';
+import {
+  createContext,
+  useState,
+  type ReactNode,
+  useEffect,
+} from 'react';
+
 import type { Task, Project } from '../types';
-import { tasksApi } from '../../api/api';
+
+import {
+  tasksApi,
+  projectsApi,
+} from '../../api/api';
+
 import { socket } from '../../socket/socket';
 
 export interface DataContextType {
@@ -8,12 +19,22 @@ export interface DataContextType {
   projects: Project[];
 
   addTask: (task: Omit<Task, 'id'>) => Promise<void>;
-  updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
+  updateTask: (
+    id: string,
+    updates: Partial<Task>
+  ) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
 
-  addProject: (project: Omit<Project, 'id'>) => void;
-  updateProject: (id: string, updates: Partial<Project>) => void;
-  deleteProject: (id: string) => void;
+  addProject: (
+    project: Omit<Project, 'id'>
+  ) => Promise<void>;
+
+  updateProject: (
+    id: string,
+    updates: Partial<Project>
+  ) => Promise<void>;
+
+  deleteProject: (id: string) => Promise<void>;
 
   importData: (data: {
     tasks?: Task[];
@@ -29,97 +50,95 @@ export interface DataContextType {
   error: string | null;
 }
 
-export const DataContext = createContext<DataContextType>(
-  {} as DataContextType
-);
+export const DataContext =
+  createContext<DataContextType>(
+    {} as DataContextType
+  );
 
-const STORAGE_KEYS = {
-  PROJECTS: 'app-projects',
-};
-
-export function DataProvider({ children }: { children: ReactNode }) {
+export function DataProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   // =========================
-  // TASKS
+  // STATE
   // =========================
 
   const [tasks, setTasks] = useState<Task[]>([]);
 
-  const [loading, setLoading] = useState(false);
+  const [projects, setProjects] =
+    useState<Project[]>([]);
 
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState<string | null>(null);
 
   // =========================
-  // PROJECTS (LOCAL TEMP)
+  // LOADERS
   // =========================
 
-  const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.PROJECTS);
+  const loadTasks = async () => {
+    try {
+      const data = await tasksApi.getAll();
+      setTasks(data);
+    } catch (err: unknown) {
+      console.error('loadTasks error:', err);
 
-    if (saved) {
-      const parsed = JSON.parse(saved);
-
-      return parsed.map((project: Partial<Project>) => ({
-        ...project,
-        theme: project.theme || 'dark',
-        customColor: project.customColor,
-        parentId: project.parentId ?? null,
-        sharedWith: project.sharedWith || [],
-      }));
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Nie udało się pobrać tasków'
+      );
     }
+  };
 
-    return [
-      {
-        id: 'inbox',
-        name: 'Inbox',
-        color: '#6366f1',
-        theme: 'dark',
-        parentId: null,
-        sharedWith: [],
-      },
-      {
-        id: 'personal',
-        name: 'Personal',
-        color: '#ec4899',
-        theme: 'dark',
-        parentId: null,
-        sharedWith: [],
-      },
-      {
-        id: 'work',
-        name: 'Work',
-        color: '#14b8a6',
-        theme: 'dark',
-        parentId: null,
-        sharedWith: [],
-      },
-    ];
-  });
+  const loadProjects = async () => {
+    try {
+      const data = await projectsApi.getAll();
+      setProjects(data);
+    } catch (err: unknown) {
+      console.error('loadProjects error:', err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Nie udało się pobrać projektów'
+      );
+    }
+  };
 
   // =========================
-  // LOAD TASKS + REALTIME
+  // INIT + REALTIME
   // =========================
 
   useEffect(() => {
     let mounted = true;
 
-    const loadTasks = async () => {
+    const init = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const data = await tasksApi.getAll();
+        const [tasksData, projectsData] =
+          await Promise.all([
+            tasksApi.getAll(),
+            projectsApi.getAll(),
+          ]);
 
-        if (mounted) {
-          setTasks(data);
-        }
+        if (!mounted) return;
+
+        setTasks(tasksData);
+        setProjects(projectsData);
       } catch (err: unknown) {
-        console.error('loadTasks error:', err);
+        console.error('init error:', err);
 
         if (mounted) {
           setError(
             err instanceof Error
               ? err.message
-              : 'Nie udało się pobrać tasków'
+              : 'Błąd ładowania danych'
           );
         }
       } finally {
@@ -129,29 +148,52 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    loadTasks();
+    init();
 
     socket.on('tasksUpdated', loadTasks);
 
+    socket.on(
+      'projectsUpdated',
+      loadProjects
+    );
+
     return () => {
       mounted = false;
-      socket.off('tasksUpdated', loadTasks);
+
+      socket.off(
+        'tasksUpdated',
+        loadTasks
+      );
+
+      socket.off(
+        'projectsUpdated',
+        loadProjects
+      );
     };
   }, []);
 
   // =========================
-  // ADD TASK
+  // TASKS
   // =========================
 
-  const addTask = async (task: Omit<Task, 'id'>) => {
+  const addTask = async (
+    task: Omit<Task, 'id'>
+  ) => {
     try {
       setError(null);
 
-      const newTask = await tasksApi.create(task);
+      const newTask =
+        await tasksApi.create(task);
 
-      setTasks((prev) => [...prev, newTask]);
+      setTasks((prev) => [
+        ...prev,
+        newTask,
+      ]);
     } catch (err: unknown) {
-      console.error('addTask error:', err);
+      console.error(
+        'addTask error:',
+        err
+      );
 
       setError(
         err instanceof Error
@@ -161,10 +203,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // =========================
-  // UPDATE TASK
-  // =========================
-
   const updateTask = async (
     id: string,
     updates: Partial<Task>
@@ -172,15 +210,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
 
-      const updatedTask = await tasksApi.update(id, updates);
+      const updatedTask =
+        await tasksApi.update(
+          id,
+          updates
+        );
 
       setTasks((prev) =>
         prev.map((task) =>
-          task.id === id ? updatedTask : task
+          task.id === id
+            ? updatedTask
+            : task
         )
       );
     } catch (err: unknown) {
-      console.error('updateTask error:', err);
+      console.error(
+        'updateTask error:',
+        err
+      );
 
       setError(
         err instanceof Error
@@ -190,21 +237,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // =========================
-  // DELETE TASK
-  // =========================
-
-  const deleteTask = async (id: string) => {
+  const deleteTask = async (
+    id: string
+  ) => {
     try {
       setError(null);
 
       await tasksApi.delete(id);
 
       setTasks((prev) =>
-        prev.filter((task) => task.id !== id)
+        prev.filter(
+          (task) => task.id !== id
+        )
       );
     } catch (err: unknown) {
-      console.error('deleteTask error:', err);
+      console.error(
+        'deleteTask error:',
+        err
+      );
 
       setError(
         err instanceof Error
@@ -215,52 +265,105 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   // =========================
-  // PROJECTS LOCAL STORAGE
+  // PROJECTS
   // =========================
 
-  useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEYS.PROJECTS,
-      JSON.stringify(projects)
-    );
-  }, [projects]);
-
-  // =========================
-  // PROJECTS CRUD
-  // =========================
-
-  const addProject = (
+  const addProject = async (
     project: Omit<Project, 'id'>
   ) => {
-    const newProject: Project = {
-      ...project,
-      id: Date.now().toString(),
-    };
+    try {
+      setError(null);
 
-    setProjects((prev) => [...prev, newProject]);
+      const newProject =
+        await projectsApi.create(
+          project
+        );
+
+      setProjects((prev) => [
+        ...prev,
+        newProject,
+      ]);
+    } catch (err: unknown) {
+      console.error(
+        'addProject error:',
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Błąd dodawania projektu'
+      );
+    }
   };
 
-  const updateProject = (
+  const updateProject = async (
     id: string,
     updates: Partial<Project>
   ) => {
-    setProjects((prev) =>
-      prev.map((project) =>
-        project.id === id
-          ? { ...project, ...updates }
-          : project
-      )
-    );
+    try {
+      setError(null);
+
+      const updatedProject =
+        await projectsApi.update(
+          id,
+          updates
+        );
+
+      setProjects((prev) =>
+        prev.map((project) =>
+          project.id === id
+            ? updatedProject
+            : project
+        )
+      );
+    } catch (err: unknown) {
+      console.error(
+        'updateProject error:',
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Błąd aktualizacji projektu'
+      );
+    }
   };
 
-  const deleteProject = (id: string) => {
-    setProjects((prev) =>
-      prev.filter((project) => project.id !== id)
-    );
+  const deleteProject = async (
+    id: string
+  ) => {
+    try {
+      setError(null);
 
-    setTasks((prev) =>
-      prev.filter((task) => task.projectId !== id)
-    );
+      await projectsApi.delete(id);
+
+      setProjects((prev) =>
+        prev.filter(
+          (project) =>
+            project.id !== id
+        )
+      );
+
+      setTasks((prev) =>
+        prev.filter(
+          (task) =>
+            task.projectId !== id
+        )
+      );
+    } catch (err: unknown) {
+      console.error(
+        'deleteProject error:',
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Błąd usuwania projektu'
+      );
+    }
   };
 
   // =========================
