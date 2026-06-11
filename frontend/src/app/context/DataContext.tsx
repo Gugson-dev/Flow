@@ -46,6 +46,7 @@ export interface DataContextType {
     projects: Project[];
   };
 
+  inboxProject?: Project;
   loading: boolean;
   error: string | null;
 }
@@ -171,6 +172,8 @@ export function DataProvider({
       );
     };
   }, []);
+
+  const inboxProject = projects.find(p => p.isSystem);
 
   // =========================
   // TASKS
@@ -407,6 +410,7 @@ export function DataProvider({
         importData,
         exportData,
 
+        inboxProject,
         loading,
         error,
       }}

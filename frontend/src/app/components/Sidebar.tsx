@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ChevronDown,
   FolderInput,
+  InboxIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { AddProjectDialog } from './AddProjectDialog';
@@ -15,7 +16,7 @@ import type { Project } from '../types';
 
 export function Sidebar() {
   const location = useLocation();
-  const { projects, tasks, updateProject } = useData();
+  const { projects, tasks, updateProject, inboxProject } = useData();
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [showMoveMenu, setShowMoveMenu] = useState<string | null>(null);
@@ -43,6 +44,12 @@ export function Sidebar() {
     ).length;
   };
 
+  const getInboxTaskCount = () => {
+    return tasks.filter(
+      (task) => task.projectId === inboxProject?.id && !task.completed
+    ).length;
+  }
+
   const getUpcomingTaskCount = () => {
     const today = new Date().toISOString().split('T')[0];
     return tasks.filter(
@@ -57,21 +64,22 @@ export function Sidebar() {
 
   // Get valid parent options for a project (exclude itself and its descendants)
   const getValidParents = (projectId: string) => {
-    const project = projects.find(p => p.id === projectId);
+    const project = projects.find(p => p.id === projectId && !p.isSystem);
     if (!project) return [];
     
     const descendants = new Set<string>();
     const findDescendants = (id: string) => {
       descendants.add(id);
-      const children = projects.filter(p => p.parentId === id);
+      const children = projects.filter(p => p.parentId === id && !p.isSystem);
       children.forEach(child => findDescendants(child.id));
     };
     findDescendants(projectId);
     
-    return projects.filter(p => !descendants.has(p.id) && p.id !== projectId);
+    return projects.filter(p => !descendants.has(p.id) && p.id !== projectId && !p.isSystem);
   };
 
   const renderProject = (project: Project, level: number = 0) => {
+    if (project.isSystem) return null; // Don't render system projects in the sidebar
     const subProjects = getSubProjects(project.id);
     const hasSubProjects = subProjects.length > 0;
     const isExpanded = expandedProjects.has(project.id);
@@ -185,6 +193,18 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <Link
+          to="/inbox"
+          className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+            location.pathname === '/inbox'
+              ? 'bg-blue-600 text-white'
+              : 'hover:bg-white/5'
+          }`}
+        >
+          <InboxIcon size={18} />
+          <span className="text-sm font-medium flex-1">Inbox</span>
+          <span className="text-xs opacity-70">{getInboxTaskCount()}</span>
+        </Link>
         <Link
           to="/"
           className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${

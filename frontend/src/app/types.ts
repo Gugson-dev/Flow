@@ -17,6 +17,7 @@ export interface Task {
 }
 
 export interface Project {
+  isSystem: boolean; // Indicates if this is a system project (like Inbox)
   id: string;
   name: string;
   color: string;

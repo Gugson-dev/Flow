@@ -7,6 +7,7 @@
 generator client {
   provider = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  output   = "./generated"
 }
 
 datasource db {
@@ -38,6 +39,8 @@ model Project {
   parentId    String?
   sharedWith  String[]
 
+  isSystem    Boolean  @default(false)
   createdAt   DateTime @default(now())
   tasks Task[]
 }
+

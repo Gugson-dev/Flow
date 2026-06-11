@@ -14,6 +14,7 @@ interface AddTaskDialogProps {
   defaultDate?: string;
 }
 
+
 export function AddTaskDialog({
   isOpen,
   onClose,
@@ -21,14 +22,14 @@ export function AddTaskDialog({
   defaultProjectId,
   defaultDate,
 }: AddTaskDialogProps) {
-  const { addTask, updateTask, projects } = useData();
+  const { addTask, updateTask, projects, inboxProject } = useData();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>(1);
   const [date, setDate] = useState(defaultDate || getTodayISO());
   const [endDate, setEndDate] = useState<string>('');
   const [projectId, setProjectId] = useState<string | null>(
-    defaultProjectId || 'inbox'
+    defaultProjectId ||  inboxProject?.id || null
   );
   const [assignedTo, setAssignedTo] = useState<string>('');
 
@@ -48,10 +49,10 @@ export function AddTaskDialog({
       // Always default to today when creating a new task
       setDate(getTodayISO());
       setEndDate('');
-      setProjectId(defaultProjectId || 'inbox');
+      setProjectId(defaultProjectId || inboxProject?.id || null);
       setAssignedTo('');
     }
-  }, [editTask, defaultProjectId, isOpen]);
+  }, [editTask, defaultProjectId, isOpen, inboxProject]);
 
   if (!isOpen) return null;
 
@@ -197,9 +198,9 @@ export function AddTaskDialog({
           <div>
             <label className="block text-sm font-medium mb-2">Project</label>
             <select
-              value={projectId || 'inbox'}
+              value={projectId || ''}
               onChange={(e) =>
-                setProjectId(e.target.value === 'inbox' ? 'inbox' : e.target.value)
+                setProjectId(e.target.value)
               }
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >

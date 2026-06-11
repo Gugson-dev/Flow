@@ -75,6 +75,7 @@ export function AddProjectDialog({ isOpen, onClose, editProject }: AddProjectDia
         customColor: theme === 'colorful' ? customColor : undefined,
         parentId,
         sharedWith,
+        isSystem: false
       });
     }
 
