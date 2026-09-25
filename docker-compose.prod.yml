@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: flow
+      POSTGRES_PASSWORD: flow
+      POSTGRES_DB: flowdb
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://flow:flow@db:5432/flowdb
+      CLIENT_URL: http://localhost
+    expose:
+      - "3000"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  db_data:

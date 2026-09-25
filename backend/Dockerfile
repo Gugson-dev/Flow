@@ -13,11 +13,17 @@ RUN npm ci
 # Skopiuj resztę kodu
 COPY . .
 
+# Wygeneruj klienta Prisma
+RUN npx prisma generate
+
 # Zbuduj backend (NestJS)
 RUN npm run build
+
+RUN cp -r prisma/generated dist/prisma/generated
 
 # Expose port NestJS
 EXPOSE 3000
 
 # Domyślna komenda
-CMD ["npm", "run", "start:dev"]
+CMD ["node", "dist/src/main.js"]
+

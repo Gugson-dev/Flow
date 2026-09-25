@@ -1,6 +1,7 @@
 # frontend/Dockerfile
-FROM node:20-alpine
+FROM node:20-alpine AS build
 
+# Ustaw katalog roboczy
 WORKDIR /app
 
 # Kopiuj package.json i package-lock.json
@@ -15,9 +16,17 @@ COPY . .
 # Build aplikacji Vite/React
 RUN npm run build
 
-# Serwuj frontend np. za pomocą `serve`
-RUN npm install -g serve
+# Użyj Nginx do serwowania statycznych plików
+FROM nginx:alpine
 
-EXPOSE 5173
+# Skopiuj pliki z etapu build do katalogu Nginx
+COPY --from=build /app/dist /usr/share/nginx/html
 
-CMD ["serve", "-s", "dist", "-l", "5173"]
+# Skopiuj konfigurację Nginx
+COPY nginx/default.conf /etc/nginx/conf.d/default.conf
+
+# Ustawienie portu, na którym Nginx będzie nasłuchiwał
+EXPOSE 80
+
+# Domyślna komenda
+CMD ["nginx", "-g", "daemon off;"]

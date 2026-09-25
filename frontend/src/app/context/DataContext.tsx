@@ -188,6 +188,8 @@ export function DataProvider({
       const newTask =
         await tasksApi.create(task);
 
+      console.log('NEW TASK:', newTask);
+
       setTasks((prev) => [
         ...prev,
         newTask,
@@ -281,6 +283,8 @@ export function DataProvider({
         await projectsApi.create(
           project
         );
+      
+      console.log('NEW PROJECT:', newProject);
 
       setProjects((prev) => [
         ...prev,
