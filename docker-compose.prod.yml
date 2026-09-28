@@ -14,6 +14,7 @@ services:
     environment:
       DATABASE_URL: postgresql://flow:flow@db:5432/flowdb
       CLIENT_URL: http://localhost
+      JWT_SECRET: ${JWT_SECRET}
     expose:
       - "3000"
     depends_on:

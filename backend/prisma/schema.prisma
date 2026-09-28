@@ -41,6 +41,10 @@ model Project {
 
   isSystem    Boolean  @default(false)
   createdAt   DateTime @default(now())
+
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id])
+
   tasks Task[]
 }
 model User {
@@ -48,4 +52,5 @@ model User {
   email        String   @unique
   passwordHash String
   createdAt    DateTime @default(now())
+  projects     Project[]
 }
