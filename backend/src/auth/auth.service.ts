@@ -1,10 +1,10 @@
+
 import {
   ConflictException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -15,14 +15,12 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async register(
-    email: string,
-    password: string,
-  ) {
-    const existingUser =
-      await this.prisma.user.findUnique({
-        where: { email },
-      });
+  async register(email: string, password: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
 
     if (existingUser) {
       throw new ConflictException(
@@ -30,57 +28,63 @@ export class AuthService {
       );
     }
 
-    const passwordHash =
-      await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 12);
 
-    const user =
-      await this.prisma.user.create({
-        data: {
-          email,
-          passwordHash,
+    const user = await this.prisma.user.create({
+      data: {
+        email: normalizedEmail,
+        passwordHash,
+        projects: {
+          create: {
+            name: 'Inbox',
+            color: '#6366f1',
+            theme: 'dark',
+            isSystem: true,
+            sharedWith: [],
+          },
         },
-        select: {
-          id: true,
-          email: true,
-          createdAt: true,
-        },
-      });
+      },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+      },
+    });
 
     return user;
   }
 
-  async login(
-  email: string,
-  password: string,
-) {
-  const user = await this.prisma.user.findUnique({
-    where: { email },
-  });
+  async login(email: string, password: string) {
+    const normalizedEmail = email.trim().toLowerCase();
 
-  if (!user) {
-    throw new UnauthorizedException(
-      'Nieprawidłowy email lub hasło',
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException(
+        'Nieprawidłowy email lub hasło',
+      );
+    }
+
+    const passwordValid = await bcrypt.compare(
+      password,
+      user.passwordHash,
     );
+
+    if (!passwordValid) {
+      throw new UnauthorizedException(
+        'Nieprawidłowy email lub hasło',
+      );
+    }
+
+    const accessToken = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+    });
+
+    return {
+      access_token: accessToken,
+    };
   }
-
-  const passwordValid = await bcrypt.compare(
-    password,
-    user.passwordHash,
-  );
-
-  if (!passwordValid) {
-    throw new UnauthorizedException(
-      'Nieprawidłowy email lub hasło',
-    );
-  }
-
-  const accessToken = this.jwtService.sign({
-  sub: user.id,
-  email: user.email,
-  });
-
-  return {
-    access_token: accessToken,
-  };
-}
 }

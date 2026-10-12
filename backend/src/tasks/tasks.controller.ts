@@ -1,44 +1,84 @@
-import { Controller, Get, Post, Body, Param, Delete, Patch } from '@nestjs/common'
-import { TasksService } from './tasks.service'
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  Patch,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+
+import { TasksService } from './tasks.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { AuthenticatedRequest } from '../auth/jwt-auth.guard';
 
 @Controller('tasks')
+@UseGuards(JwtAuthGuard)
 export class TasksController {
+  constructor(
+    private readonly tasksService: TasksService,
+  ) {}
 
-  constructor(private tasksService: TasksService) {}
+  @Get()
+  findAll(@Req() req: AuthenticatedRequest) {
+    return this.tasksService.findAll(req.user.id);
+  }
 
   @Post()
-  create(@Body() body: { content: string }) {
-    return this.tasksService.create(body)
+  create(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: any,
+  ) {
+    return this.tasksService.create(req.user.id, body);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.tasksService.update(id, body);
+  update(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Body() body: any,
+  ) {
+    return this.tasksService.update(
+      id,
+      req.user.id,
+      body,
+    );
   }
 
   @Post(':id/toggle')
-  async toggle(@Body() body: { id: string; completed: boolean }) {
-    return this.tasksService.update(body.id, body.completed)
+  toggle(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Body() body: { completed?: boolean },
+  ) {
+    return this.tasksService.toggle(
+      id,
+      req.user.id,
+      body.completed,
+    );
   }
 
   @Post(':id')
-  async remove(@Body() body: { id: string }) {
-    return this.tasksService.delete(body.id)
+  remove(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.tasksService.delete(id, req.user.id);
   }
 
   @Delete()
-  async clearCompleted() {
-    const tasks = await this.tasksService.findAll()
-    return Promise.all(tasks.filter((task) => task.completed).map((task) => this.tasksService.delete(task.id)))
+  clearCompleted(@Req() req: AuthenticatedRequest) {
+    return this.tasksService.clearCompleted(req.user.id);
   }
 
   @Delete(':id')
-    delete(@Param('id') id: string) {
-      return this.tasksService.delete(id)
-}
-
-  @Get()
-  findAll() {
-    return this.tasksService.findAll()
+  delete(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.tasksService.delete(id, req.user.id);
   }
 }
