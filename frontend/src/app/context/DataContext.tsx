@@ -149,6 +149,7 @@ export function DataProvider({
       }
     };
 
+    socket.connect();
     init();
 
     socket.on('tasksUpdated', loadTasks);
@@ -170,6 +171,8 @@ export function DataProvider({
         'projectsUpdated',
         loadProjects
       );
+
+      socket.disconnect();
     };
   }, []);
 

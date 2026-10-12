@@ -1,5 +1,6 @@
-import { io } from "socket.io-client";
+import { io } from 'socket.io-client';
 
 export const socket = io(window.location.origin, {
-  path: "/socket.io",
+  path: '/socket.io',
+  autoConnect: false,
 });
