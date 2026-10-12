@@ -84,7 +84,7 @@ export class TasksService {
       },
     });
 
-    this.realtime.emitTasksUpdated();
+    this.realtime.emitTasksUpdated(userId);
 
     return task;
   }
@@ -161,7 +161,7 @@ export class TasksService {
       where: { id },
     });
 
-    this.realtime.emitTasksUpdated();
+    this.realtime.emitTasksUpdated(userId);
 
     return task;
   }
@@ -222,7 +222,7 @@ export class TasksService {
       );
     }
 
-    this.realtime.emitTasksUpdated();
+    this.realtime.emitTasksUpdated(userId);
 
     return existingTask;
   }
@@ -237,7 +237,7 @@ export class TasksService {
       },
     });
 
-    this.realtime.emitTasksUpdated();
+    this.realtime.emitTasksUpdated(userId);
 
     return {
       success: true,

@@ -12,7 +12,11 @@ import {
   projectsApi,
 } from '../../api/api';
 
-import { socket } from '../../socket/socket';
+import {
+  socket,
+  connectSocket,
+  disconnectSocket,
+} from '../../socket/socket';
 
 export interface DataContextType {
   tasks: Task[];
@@ -149,30 +153,24 @@ export function DataProvider({
       }
     };
 
-    socket.connect();
     init();
 
     socket.on('tasksUpdated', loadTasks);
+    socket.on('projectsUpdated', loadProjects);
 
-    socket.on(
-      'projectsUpdated',
-      loadProjects
-    );
+    const token = localStorage.getItem('flow_token');
+
+    if (token) {
+      connectSocket(token);
+    }
 
     return () => {
       mounted = false;
 
-      socket.off(
-        'tasksUpdated',
-        loadTasks
-      );
+      socket.off('tasksUpdated', loadTasks);
+      socket.off('projectsUpdated', loadProjects);
 
-      socket.off(
-        'projectsUpdated',
-        loadProjects
-      );
-
-      socket.disconnect();
+      disconnectSocket();
     };
   }, []);
 
