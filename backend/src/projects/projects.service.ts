@@ -100,7 +100,6 @@ export class ProjectsService {
         color: data.color,
         theme: data.theme,
         customColor: data.customColor,
-        parentId: data.parentId ?? null,
         sharedWith: [],
         isSystem: false,
         owner: {
@@ -108,6 +107,13 @@ export class ProjectsService {
             id: userId,
           },
         },
+        ...(data.parentId != null && {
+          parent: {
+            connect: {
+              id: data.parentId,
+            },
+          },
+        }),
       },
     });
 
@@ -162,7 +168,11 @@ export class ProjectsService {
         ...(color !== undefined && { color }),
         ...(theme !== undefined && { theme }),
         ...(customColor !== undefined && { customColor }),
-        ...(parentId !== undefined && { parentId }),
+        ...(parentId !== undefined && {
+          parent: parentId === null
+            ? { disconnect: true }
+            : { connect: { id: parentId } },
+        }),
       },
     });
 

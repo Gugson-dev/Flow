@@ -347,19 +347,14 @@ export function DataProvider({
 
       await projectsApi.delete(id);
 
-      setProjects((prev) =>
-        prev.filter(
-          (project) =>
-            project.id !== id
-        )
-      );
+      const [projectsData, tasksData] = await Promise.all([
+        projectsApi.getAll(),
+        tasksApi.getAll(),
+      ]);
 
-      setTasks((prev) =>
-        prev.filter(
-          (task) =>
-            task.projectId !== id
-        )
-      );
+      setProjects(projectsData);
+      setTasks(tasksData);
+      
     } catch (err: unknown) {
       console.error(
         'deleteProject error:',
