@@ -8,8 +8,9 @@ import { ProjectsModule } from './projects/projects.module';
 import { RealtimeGateway } from './realtime/realtime.gateway';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { InvitationsModule } from './invitations/invitations.module';
 @Module({
-  imports: [TasksModule, AuthModule, PrismaModule, ProjectsModule, UsersModule, ConfigModule.forRoot({
+  imports: [TasksModule, AuthModule, PrismaModule, ProjectsModule, UsersModule, InvitationsModule, ConfigModule.forRoot({
       isGlobal: true,
     })],
   controllers: [AppController],
