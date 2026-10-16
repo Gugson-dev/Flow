@@ -16,7 +16,45 @@ export class ProjectsService {
   ) {}
 
   // =========================================
-  // WALIDACJA PROJEKTU NADRZĘDNEGO
+  // POWIADOMIENIA DLA UCZESTNIKÓW
+  // =========================================
+
+  private async getProjectUsers(projectId: string): Promise<string[]> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        ownerId: true,
+        members: {
+          select: { userId: true },
+        },
+      },
+    });
+
+    if (!project) return [];
+
+    return [
+      ...new Set([
+        project.ownerId,
+        ...project.members.map((member) => member.userId),
+      ]),
+    ];
+  }
+
+  private notifyUsers(
+    userIds: Iterable<string>,
+    includeTasks = false,
+  ) {
+    for (const userId of new Set(userIds)) {
+      this.realtime.emitProjectsUpdated(userId);
+
+      if (includeTasks) {
+        this.realtime.emitTasksUpdated(userId);
+      }
+    }
+  }
+
+  // =========================================
+  // WALIDACJA HIERARCHII
   // =========================================
 
   private async validateParent(
@@ -24,15 +62,7 @@ export class ProjectsService {
     parentId: string | null,
     projectId?: string,
   ): Promise<void> {
-    if (parentId === null) {
-      return;
-    }
-
-    if (parentId === projectId) {
-      throw new BadRequestException(
-        'Projekt nie może być własnym rodzicem',
-      );
-    }
+    if (parentId === null) return;
 
     const visited = new Set<string>();
     let currentId: string | null = parentId;
@@ -77,7 +107,16 @@ export class ProjectsService {
   async findAll(userId: string) {
     return this.prisma.project.findMany({
       where: {
-        ownerId: userId,
+        OR: [
+          { ownerId: userId },
+          {
+            members: {
+              some: {
+                userId,
+              },
+            },
+          },
+        ],
       },
       orderBy: {
         createdAt: 'desc',
@@ -102,22 +141,20 @@ export class ProjectsService {
         customColor: data.customColor,
         sharedWith: [],
         isSystem: false,
+
         owner: {
-          connect: {
-            id: userId,
-          },
+          connect: { id: userId },
         },
+
         ...(data.parentId != null && {
           parent: {
-            connect: {
-              id: data.parentId,
-            },
+            connect: { id: data.parentId },
           },
         }),
       },
     });
 
-    this.realtime.emitProjectsUpdated(userId);
+    this.notifyUsers([userId]);
 
     return project;
   }
@@ -154,7 +191,7 @@ export class ProjectsService {
       parentId,
     } = data;
 
-    if (parentId !== undefined && parentId !== null) {
+    if (parentId != null) {
       await this.validateParent(userId, parentId, id);
     }
 
@@ -162,6 +199,7 @@ export class ProjectsService {
       where: {
         id,
         ownerId: userId,
+        isSystem: false,
       },
       data: {
         ...(name !== undefined && { name }),
@@ -176,16 +214,81 @@ export class ProjectsService {
       },
     });
 
-    this.realtime.emitProjectsUpdated(userId);
+    const recipients = await this.getProjectUsers(id);
+    this.notifyUsers(recipients);
 
     return project;
   }
 
   // =========================================
-  // USUWANIE PROJEKTU
+  // USUWANIE PROJEKTU I PODPROJEKTÓW
   // =========================================
 
   async delete(id: string, userId: string) {
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id,
+        ownerId: userId,
+        isSystem: false,
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException(
+        'Projekt nie istnieje, jest systemowy lub nie masz do niego dostępu',
+      );
+    }
+
+    // Przed kaskadowym usunięciem pobieramy użytkowników
+    // z całego drzewa projektów.
+    const allProjects = await this.prisma.project.findMany({
+      select: {
+        id: true,
+        parentId: true,
+        ownerId: true,
+        isSystem: true,
+        members: {
+          select: { userId: true },
+        },
+      },
+    });
+
+    const projectIds = new Set<string>([id]);
+    const recipients = new Set<string>([userId]);
+
+    let changed = true;
+
+    while (changed) {
+      changed = false;
+
+      for (const item of allProjects) {
+        if (
+          item.parentId &&
+          projectIds.has(item.parentId) &&
+          !projectIds.has(item.id)
+        ) {
+          projectIds.add(item.id);
+          changed = true;
+        }
+      }
+    }
+
+    for (const item of allProjects) {
+      if (!projectIds.has(item.id)) continue;
+
+      if (item.ownerId !== userId || item.isSystem) {
+        throw new BadRequestException(
+          'Nie można usunąć hierarchii zawierającej cudzy lub systemowy projekt',
+        );
+      }
+
+      recipients.add(item.ownerId);
+
+      for (const member of item.members) {
+        recipients.add(member.userId);
+      }
+    }
+
     const result = await this.prisma.project.deleteMany({
       where: {
         id,
@@ -194,17 +297,15 @@ export class ProjectsService {
       },
     });
 
-    if (result.count === 0) {
+    if (result.count !== 1) {
       throw new NotFoundException(
-        'Projekt nie istnieje, jest systemowy lub nie masz do niego dostępu',
+        'Projekt nie istnieje lub nie masz do niego dostępu',
       );
     }
 
-    this.realtime.emitProjectsUpdated(userId);
-    this.realtime.emitTasksUpdated(userId);
+    // PostgreSQL usuwa podprojekty i zadania przez CASCADE.
+    this.notifyUsers(recipients, true);
 
-    return {
-      success: true,
-    };
+    return { success: true };
   }
 }

@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
@@ -14,6 +15,70 @@ export class TasksService {
     private readonly realtime: RealtimeGateway,
   ) {}
 
+  // =========================================
+  // UPRAWNIENIA
+  // =========================================
+
+  private readableProject(userId: string) {
+    return {
+      OR: [
+        { ownerId: userId },
+        {
+          members: {
+            some: { userId },
+          },
+        },
+      ],
+    };
+  }
+
+  private writableProject(userId: string) {
+    return {
+      OR: [
+        { ownerId: userId },
+        {
+          members: {
+            some: {
+              userId,
+              role: 'EDITOR' as const,
+            },
+          },
+        },
+      ],
+    };
+  }
+
+  // =========================================
+  // POWIADOMIENIA
+  // =========================================
+
+  private async notifyProjectUsers(projectId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        ownerId: true,
+        members: {
+          select: { userId: true },
+        },
+      },
+    });
+
+    if (!project) return;
+
+    const userIds = new Set([
+      project.ownerId,
+      ...project.members.map((member) => member.userId),
+    ]);
+
+    for (const userId of userIds) {
+      this.realtime.emitTasksUpdated(userId);
+    }
+  }
+
+  // =========================================
+  // ROZWIĄZYWANIE PROJEKTU
+  // =========================================
+
   private async resolveProjectId(
     userId: string,
     projectId?: string | null,
@@ -22,25 +87,28 @@ export class TasksService {
       const project = await this.prisma.project.findFirst({
         where: {
           id: projectId,
-          ownerId: userId,
+          ...this.writableProject(userId),
         },
+        select: { id: true },
       });
 
       if (!project) {
         throw new NotFoundException(
-          'Projekt nie istnieje lub nie masz do niego dostępu',
+          'Projekt nie istnieje lub nie masz uprawnień do edycji',
         );
       }
 
       return project.id;
     }
 
+    // Brak projectId oznacza prywatny Inbox.
     const inbox = await this.prisma.project.findFirst({
       where: {
         ownerId: userId,
         isSystem: true,
         name: 'Inbox',
       },
+      select: { id: true },
     });
 
     if (!inbox) {
@@ -52,11 +120,15 @@ export class TasksService {
     return inbox.id;
   }
 
+  // =========================================
+  // POBIERANIE ZADAŃ
+  // =========================================
+
   async findAll(userId: string) {
     return this.prisma.task.findMany({
       where: {
         project: {
-          ownerId: userId,
+          is: this.readableProject(userId),
         },
       },
       orderBy: {
@@ -64,6 +136,10 @@ export class TasksService {
       },
     });
   }
+
+  // =========================================
+  // TWORZENIE ZADANIA
+  // =========================================
 
   async create(userId: string, data: any) {
     const projectId = await this.resolveProjectId(
@@ -80,28 +156,34 @@ export class TasksService {
         endDate: data.endDate,
         completed: data.completed ?? false,
         assignedTo: data.assignedTo,
-        projectId,
+        project: {
+          connect: { id: projectId },
+        },
       },
     });
 
-    this.realtime.emitTasksUpdated(userId);
+    await this.notifyProjectUsers(projectId);
 
     return task;
   }
+
+  // =========================================
+  // AKTUALIZACJA ZADANIA
+  // =========================================
 
   async update(id: string, userId: string, data: any) {
     const existingTask = await this.prisma.task.findFirst({
       where: {
         id,
         project: {
-          ownerId: userId,
+          is: this.writableProject(userId),
         },
       },
     });
 
     if (!existingTask) {
       throw new NotFoundException(
-        'Zadanie nie istnieje lub nie masz do niego dostępu',
+        'Zadanie nie istnieje lub nie masz uprawnień do edycji',
       );
     }
 
@@ -145,15 +227,15 @@ export class TasksService {
       where: {
         id,
         project: {
-          ownerId: userId,
+          is: this.writableProject(userId),
         },
       },
       data: changes,
     });
 
-    if (result.count === 0) {
+    if (result.count !== 1) {
       throw new NotFoundException(
-        'Zadanie nie istnieje lub nie masz do niego dostępu',
+        'Zadanie nie istnieje lub nie masz uprawnień do edycji',
       );
     }
 
@@ -161,10 +243,23 @@ export class TasksService {
       where: { id },
     });
 
-    this.realtime.emitTasksUpdated(userId);
+    if (existingTask.projectId) {
+      await this.notifyProjectUsers(existingTask.projectId);
+    }
+
+    if (
+      projectId &&
+      projectId !== existingTask.projectId
+    ) {
+      await this.notifyProjectUsers(projectId);
+    }
 
     return task;
   }
+
+  // =========================================
+  // PRZEŁĄCZANIE UKOŃCZENIA
+  // =========================================
 
   async toggle(
     id: string,
@@ -175,14 +270,14 @@ export class TasksService {
       where: {
         id,
         project: {
-          ownerId: userId,
+          is: this.writableProject(userId),
         },
       },
     });
 
     if (!task) {
       throw new NotFoundException(
-        'Zadanie nie istnieje lub nie masz do niego dostępu',
+        'Zadanie nie istnieje lub nie masz uprawnień do edycji',
       );
     }
 
@@ -191,19 +286,23 @@ export class TasksService {
     });
   }
 
+  // =========================================
+  // USUWANIE ZADANIA
+  // =========================================
+
   async delete(id: string, userId: string) {
     const existingTask = await this.prisma.task.findFirst({
       where: {
         id,
         project: {
-          ownerId: userId,
+          is: this.writableProject(userId),
         },
       },
     });
 
     if (!existingTask) {
       throw new NotFoundException(
-        'Zadanie nie istnieje lub nie masz do niego dostępu',
+        'Zadanie nie istnieje lub nie masz uprawnień do usunięcia',
       );
     }
 
@@ -211,33 +310,56 @@ export class TasksService {
       where: {
         id,
         project: {
-          ownerId: userId,
+          is: this.writableProject(userId),
         },
       },
     });
 
-    if (result.count === 0) {
+    if (result.count !== 1) {
       throw new NotFoundException(
-        'Zadanie nie istnieje lub nie masz do niego dostępu',
+        'Zadanie nie istnieje lub nie masz uprawnień do usunięcia',
       );
     }
 
-    this.realtime.emitTasksUpdated(userId);
+    if (existingTask.projectId) {
+      await this.notifyProjectUsers(existingTask.projectId);
+    }
 
     return existingTask;
   }
 
+  // =========================================
+  // USUWANIE UKOŃCZONYCH ZADAŃ
+  // =========================================
+
   async clearCompleted(userId: string) {
-    const result = await this.prisma.task.deleteMany({
-      where: {
-        completed: true,
-        project: {
-          ownerId: userId,
-        },
+    const where = {
+      completed: true,
+      project: {
+        is: this.writableProject(userId),
+      },
+    };
+
+    const tasks = await this.prisma.task.findMany({
+      where,
+      select: {
+        projectId: true,
       },
     });
 
-    this.realtime.emitTasksUpdated(userId);
+    const result = await this.prisma.task.deleteMany({
+      where,
+    });
+
+    const projectIds = new Set(
+      tasks
+        .map((task) => task.projectId)
+        .filter((id): id is string => id !== null),
+    );
+
+    for (const projectId of projectIds) {
+      await this.notifyProjectUsers(projectId);
+    }
 
     return {
       success: true,
